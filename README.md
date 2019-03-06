@@ -1,5 +1,9 @@
-# bitcoin-blockchain-parser [![Build Status](https://travis-ci.org/alecalve/python-bitcoin-blockchain-parser.svg?branch=master)](https://travis-ci.org/alecalve/python-bitcoin-blockchain-parser) [![Coverage Status](https://coveralls.io/repos/alecalve/python-bitcoin-blockchain-parser/badge.svg?branch=master&service=github)](https://coveralls.io/github/alecalve/python-bitcoin-blockchain-parser?branch=master)
+# bitcoin-blockchain-parser
 This Python 3 library provides a parser for the raw data stored by bitcoind. 
+
+## This fork
+
+This is a fork of the original project be alecalve, further developed by jcrawfordor for use with his MS thesis work. This is actively under development, so the original README from alecalve, below, may not be entirely correct.
 
 ## Features
 - Detects outputs types
