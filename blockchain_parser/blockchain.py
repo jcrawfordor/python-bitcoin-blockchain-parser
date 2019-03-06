@@ -78,10 +78,12 @@ class Blockchain(object):
     maintained by bitcoind.
     """
 
-    def __init__(self, path):
+    def __init__(self, path, indexPath, cache=None):
         self.path = path
         self.blockIndexes = None
-        self.indexPath = None
+        self.indexPath = indexPath
+        self.cache = cache
+        self.blockIndexes = self._build_block_index()
 
     def get_unordered_blocks(self):
         """Yields the blocks contained in the .blk files as is,
@@ -90,20 +92,6 @@ class Blockchain(object):
         for blk_file in get_files(self.path):
             for raw_block in get_blocks(blk_file):
                 yield Block(raw_block)
-
-    def __getBlockIndexes(self, index):
-        """There is no method of leveldb to close the db (and release the lock).
-        This creates problem during concurrent operations.
-        This function also provides caching of indexes.
-        """
-        if self.indexPath != index:
-            db = plyvel.DB(index, compression=None)
-            self.blockIndexes = [DBBlockIndex(format_hash(k[1:]), v)
-                                 for k, v in db.iterator() if k[0] == ord('b')]
-            db.close()
-            self.blockIndexes.sort(key=lambda x: x.height)
-            self.indexPath = index
-        return self.blockIndexes
 
     def _index_confirmed(self, chain_indexes, num_confirmations=6):
         """Check if the first block index in "chain_indexes" has at least
@@ -149,26 +137,25 @@ class Blockchain(object):
                     else:
                         return False
 
-    def get_ordered_blocks(self, index, start=0, end=None, cache=None):
-        """Yields the blocks contained in the .blk files as per
-        the heigt extract from the leveldb index present at path
-        index maintained by bitcoind.
-        """
+    def _build_block_index(self):
+        """Gets block index data structure from leveldb"""
 
-        blockIndexes = None
-
-        if cache and os.path.exists(cache):
+        if self.cache and os.path.exists(self.cache):
             # load the block index cache from a previous index
-            with open(cache, 'rb') as f:
+            with open(self.cache, 'rb') as f:
                 blockIndexes = pickle.load(f)
 
-        if blockIndexes is None:
-            # build the block index
-            blockIndexes = self.__getBlockIndexes(index)
-            if cache and not os.path.exists(cache):
-                # cache the block index for re-use next time
-                with open(cache, 'wb') as f:
-                    pickle.dump(blockIndexes, f)
+        # Read the LevelDB
+        db = plyvel.DB(self.indexPath, compression=None)
+        self.blockIndexes = [DBBlockIndex(format_hash(k[1:]), v)
+                             for k, v in db.iterator() if k[0] == ord('b')]
+        db.close()
+        blockIndexes.sort(key=lambda x: x.height)
+
+        if self.cache and not os.path.exists(self.cache):
+            # cache the block index for re-use next time
+            with open(self.cache, 'wb') as f:
+                pickle.dump(blockIndexes, f)
 
         # remove small forks that may have occured while the node was live.
         # Occassionally a node will receive two different solutions to a block
@@ -204,7 +191,24 @@ class Blockchain(object):
         # filter out the orphan blocks, so we are left only with block indexes
         # that have been confirmed
         # (or are new enough that they haven't yet been confirmed)
-        blockIndexes = list(filter(lambda block: block.hash not in orphans, blockIndexes))
+        return list(filter(lambda block: block.hash not in orphans, blockIndexes))
+
+    def get_block_by_height(self, height):
+        """Returns a single block by height index number"""
+
+        blk = self.blockIndexes[height]
+        if blk.file == -1 or blk.data_pos == -1:
+            raise ValueError("Block not on disk")
+        blkFile = os.path.join(self.path, "blk%05d.dat" % blk.file)
+        return Block(get_block(blkFile, blk.data_pos), blk.height)
+        
+    def get_ordered_blocks(self, start=0, end=None):
+        """Yields the blocks contained in the .blk files as per
+        the heigt extract from the leveldb index present at path
+        index maintained by bitcoind.
+        """
+
+        blockIndexes = self.blockIndexes
 
         if end is None:
             end = len(blockIndexes)
