@@ -110,6 +110,15 @@ class Transaction(object):
         return self._hash
 
     @property
+    def raw_hash(self):
+        """Returns the transaction's hash"""
+        if self.is_segwit:
+            txid = self.hex[:4] + self.hex[6:self._offset_before_tx_witnesses] + self.hex[-4:]
+        else:
+            txid = self.hex
+        return double_sha256(txid)
+
+    @property
     def hash(self):
         """Returns the transaction's id. Equivalent to the hash for non SegWit transactions,
         it differs from it for SegWit ones. """

@@ -48,6 +48,12 @@ class Input(object):
         return self._transaction_hash
 
     @property
+    def raw_transaction_hash(self):
+        """Returns the hash of the transaction containing the output
+        redeemed by this input"""
+        return self.hex[:32]
+
+    @property
     def transaction_index(self):
         """Returns the index of the output inside the transaction that is
         redeemed by this input"""
