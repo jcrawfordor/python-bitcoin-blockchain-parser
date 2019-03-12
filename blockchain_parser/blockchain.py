@@ -142,14 +142,16 @@ class Blockchain(object):
     def get_transaction(self, txid):
         """Finds transaction info from LevelDB for transaction with given
         txid (as string)"""
-        txinfo = self.txIndexDb.get(b't' + bitcoin.core.lx(txid))
-        fileno, offset = decode_varint(txinfo)
-        blockOffs, size = decode_varint(txinfo[offset:])
+        txInfo = self.txIndexDb.get(b't' + bitcoin.core.lx(txid))
+        fileNo, offset = decode_varint(txInfo)
+        blockOffs, size = decode_varint(txInfo[offset:])
         offset += size
-        txOffs = decode_varint(txinfo[offset:])
-        blkFile = os.path.join(self.path, "blk%05d.dat" % fileno)
+        txOffs = decode_varint(txInfo[offset:])
+
+        blkFile = os.path.join(self.path, "blk%05d.dat" % fileNo)
         blk = Block(get_block(blkFile, blockOffs), blk.height)
-        tx = Transaction()
+        tx = blk.get_transaction(txOffs)
+        return tx
 
 
     def _build_block_index(self):
