@@ -32,6 +32,12 @@ def get_block_transactions(raw_hex):
         # Skipping to the next transaction
         offset += transaction.size
 
+def get_block_transaction(raw_hex, offset):
+    """Given the raw hexadecimal representation of a block,
+    AND an offset within the block, get the transaction
+    """
+
+    return Transaction.from_hex(raw_hex[offset:])
 
 class Block(object):
     """
@@ -81,6 +87,9 @@ class Block(object):
             self._transactions = list(get_block_transactions(self.hex))
 
         return self._transactions
+    
+    def get_transaction_offset(self, offset):
+         return Transaction.from_hex(self.hex[offset:])
 
     @property
     def header(self):

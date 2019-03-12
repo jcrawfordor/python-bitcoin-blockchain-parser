@@ -15,10 +15,11 @@ import struct
 import pickle
 import stat
 import plyvel
+import bitcoin.core
 
 from .block import Block
 from .index import DBBlockIndex
-from .utils import format_hash
+from .utils import format_hash, decode_varint
 
 
 # Constant separating blocks in the .blk files
@@ -78,12 +79,13 @@ class Blockchain(object):
     maintained by bitcoind.
     """
 
-    def __init__(self, path, indexPath, cache=None):
-        self.path = path
+    def __init__(self, path, cache=None):
+        self.path = os.path.join(path, 'blocks')
         self.blockIndexes = None
-        self.indexPath = indexPath
         self.cache = cache
         self.blockIndexes = self._build_block_index()
+        self.blockIndexDb = plyvel.DB(os.path.join(path, 'blocks', 'index'), compression=None)
+        self.txIndexDb = plyvel.DB(os.path.join(path, 'indexes', 'txindex'), compression=None)
 
     def get_unordered_blocks(self):
         """Yields the blocks contained in the .blk files as is,
@@ -137,6 +139,19 @@ class Blockchain(object):
                     else:
                         return False
 
+    def get_transaction(self, txid):
+        """Finds transaction info from LevelDB for transaction with given
+        txid (as string)"""
+        txinfo = self.txIndexDb.get(b't' + bitcoin.core.lx(txid))
+        fileno, offset = decode_varint(txinfo)
+        blockOffs, size = decode_varint(txinfo[offset:])
+        offset += size
+        txOffs = decode_varint(txinfo[offset:])
+        blkFile = os.path.join(self.path, "blk%05d.dat" % fileno)
+        blk = Block(get_block(blkFile, blockOffs), blk.height)
+        tx = Transaction()
+
+
     def _build_block_index(self):
         """Gets block index data structure from leveldb"""
 
@@ -146,9 +161,8 @@ class Blockchain(object):
                 blockIndexes = pickle.load(f)
 
         # Read the LevelDB
-        db = plyvel.DB(self.indexPath, compression=None)
         self.blockIndexes = [DBBlockIndex(format_hash(k[1:]), v)
-                             for k, v in db.iterator() if k[0] == ord('b')]
+                             for k, v in self.blockIndexDb.iterator() if k[0] == ord('b')]
         db.close()
         blockIndexes.sort(key=lambda x: x.height)
 
