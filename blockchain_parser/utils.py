@@ -12,6 +12,7 @@
 from binascii import hexlify
 import hashlib
 import struct
+from io import BytesIO
 
 
 def btc_ripemd160(data):
@@ -38,24 +39,20 @@ def decode_uint64(data):
     assert(len(data) == 8)
     return struct.unpack("<Q", data)[0]
 
-
-def decode_varint(data):
-    assert(len(data) > 0)
-    size = int(data[0])
-    assert(size <= 255)
-
-    if size < 253:
-        return size, 1
-
-    if size == 253:
-        format_ = '<H'
-    elif size == 254:
-        format_ = '<I'
-    elif size == 255:
-        format_ = '<Q'
-    else:
-        # Should never be reached
-        assert 0, "unknown format_ for size : %s" % size
-
-    size = struct.calcsize(format_)
-    return struct.unpack(format_, data[1:size+1])[0], size + 1
+def decode_varint(varint):
+    """Read a varint from byte array, return value and length"""
+    stream = BytesIO(varint)
+    length = 0
+    shift = 0
+    result = 0
+    while True:
+        ib = stream.read(1)
+        if ib == b'':
+            raise EOFError("Unexpected EOF while reading bytes")
+        i = ord(ib)
+        length += 1
+        result |= (i & 0x7f) << shift
+        shift += 7
+        if not (i & 0x80):
+            break
+    return result, length
