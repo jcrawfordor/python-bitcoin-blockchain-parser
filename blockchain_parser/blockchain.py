@@ -93,7 +93,7 @@ class Blockchain(object):
         """
         for blk_file in get_files(self.path):
             for raw_block in get_blocks(blk_file):
-                yield Block(raw_block)
+                yield Block(raw_block, parent=self)
 
     def _index_confirmed(self, chain_indexes, num_confirmations=6):
         """Check if the first block index in "chain_indexes" has at least
@@ -117,7 +117,7 @@ class Blockchain(object):
 
             # parse the block
             blkFile = os.path.join(self.path, "blk%05d.dat" % index.file)
-            block = Block(get_block(blkFile, index.data_pos))
+            block = Block(get_block(blkFile, index.data_pos), parent=self)
 
             if i == 0:
                 first_block = block
@@ -149,7 +149,7 @@ class Blockchain(object):
         txOffs = decode_varint(txInfo[offset:])
 
         blkFile = os.path.join(self.path, "blk%05d.dat" % fileNo)
-        blk = Block(get_block(blkFile, blockOffs), blk.height)
+        blk = Block(get_block(blkFile, blockOffs), parent = self)
         tx = blk.get_transaction(txOffs)
         return tx
 
@@ -216,7 +216,7 @@ class Blockchain(object):
         if blk.file == -1 or blk.data_pos == -1:
             raise ValueError("Block not on disk")
         blkFile = os.path.join(self.path, "blk%05d.dat" % blk.file)
-        return Block(get_block(blkFile, blk.data_pos), blk.height)
+        return Block(get_block(blkFile, blk.data_pos), blk.height, self)
         
     def get_ordered_blocks(self, start=0, end=None):
         """Yields the blocks contained in the .blk files as per
@@ -238,4 +238,4 @@ class Blockchain(object):
             if blkIdx.file == -1 or blkIdx.data_pos == -1:
                 break
             blkFile = os.path.join(self.path, "blk%05d.dat" % blkIdx.file)
-            yield Block(get_block(blkFile, blkIdx.data_pos), blkIdx.height)
+            yield Block(get_block(blkFile, blkIdx.data_pos), blkIdx.height, self)
